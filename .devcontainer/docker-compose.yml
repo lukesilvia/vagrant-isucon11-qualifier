@@ -1,0 +1,43 @@
+version: '3'
+services:
+  db:
+    image: mariadb:10.3.31
+    environment:
+      MYSQL_ROOT_PASSWORD: isucon
+      MYSQL_DATABASE: isucondition
+      MYSQL_USER: isucon
+      MYSQL_PASSWORD: isucon
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:6.2.5-alpine3.14
+    ports:
+      - "6379:6379"
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MYSQL_HOST: db
+    env_file:
+      - ../infra/home/isucon/env.sh.local
+    stdin_open: true
+    tty: true
+    volumes:
+      - ..:/home/isucon/workspace:cached
+      - ~/.ssh:/home/isucon/.ssh
+      - "./etc/hosts:/etc/hosts"
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "80:80"
+      - "3000:3000"
+      - "5000:5000"
+
+volumes:
+  db_data:

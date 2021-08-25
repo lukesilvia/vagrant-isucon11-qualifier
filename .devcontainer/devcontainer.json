@@ -1,0 +1,12 @@
+{
+  "name": "app",
+  "dockerComposeFile": [
+    "./docker-compose.yml"
+  ],
+  "service": "webapp",
+  "remoteUser": "isucon",
+  "extensions": [],
+  "forwardPorts": [],
+  "settings": {},
+  "workspaceFolder": "/home/isucon/workspace"
+}
