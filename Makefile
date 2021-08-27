@@ -14,7 +14,10 @@ REMOTE_GIT_DIR := /home/isucon/git
 NGINX_LOG := /var/log/nginx/access.log
 
 SSH := ssh -F $(SSH_CONFIG)
+SCP := scp -F $(SSH_CONFIG)
 RSYNC := rsync -e "$(SSH)" -av --delete --force --omit-dir-times
+
+ALP_OPTION := --sort=sum -r -m '/api/isu/\w+,/isu/\w+,/api/condition/\w+' -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg
 
 space := $(subst ,, )
 comma := ,
@@ -65,6 +68,9 @@ local.configure: ## Configure local machine.(e.g. ssh_config)
 
 notify-score:
 	echo "スコア $(SCORE) / $$(git rev-parse HEAD)" |  ./utility/notify_slack-$(shell uname -s) -c ./utility/notify_slack.toml
+
+alp: ## Exec alp
+	@$(foreach host, $(WEB), echo \#\# $(host); cat ./tmp/nginx.$(host).log | alp ltsv $(ALP_OPTION))
 
 alp.log-rotate: ## logrotate nginx on remote host
 	$(foreach host, $(WEB),$(call logrotate-nginx,$(host)))
