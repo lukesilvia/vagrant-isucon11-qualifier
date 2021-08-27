@@ -79,6 +79,10 @@ alp.log-rotate: ## logrotate nginx on remote host
 alp.log-download: ## download Nginx log
 	$(foreach host, $(WEB),$(shell $(SCP) $(host):$(NGINX_LOG) ./tmp/nginx.$(host).log))
 
+deploy.envsh: ## deploy env.sh
+	$(foreach host, $(ALL_HOSTS),$(call update-git,$(host)))
+	$(foreach host, $(ALL_HOSTS),$(call exec-command,$(host), cp ${REMOTE_GIT_DIR}/infra/home/isucon/env.sh.$(host) ~/env.sh))
+
 deploy.nginx: ## deploy nginx config
 	$(foreach host, $(WEB),$(call update-git,$(host)))
 	$(foreach host, $(WEB),$(call exec-command,$(host), find ${REMOTE_GIT_DIR}/infra/etc/nginx -type f -exec sh -c 'sudo cp {} \$$(echo {} | sed -e s_${REMOTE_GIT_DIR}/infra__)' \;))
