@@ -89,6 +89,12 @@ deploy.nginx: ## deploy nginx config
 	$(foreach host, $(WEB),$(call restart-nginx,$(host)))
 	$(call notify-slack,Executed: Update Nginx config )
 
+deploy.mysql: ## deploy mysql config
+	$(foreach host, $(DB),$(call update-git,$(host)))
+	$(foreach host, $(DB),$(call exec-command,$(host), find ${REMOTE_GIT_DIR}/infra/etc/mysql -type f -exec sh -c 'sudo cp {} \$$(echo {} | sed -e s_${REMOTE_GIT_DIR}/infra__)' \;))
+	$(foreach host, $(DB), $(call restart-db,$(host)))
+	$(call notify-slack,Executed: Update mysql config )
+
 help: ## Self-documented Makefile
 	@grep -E '^([a-zA-Z_-]|\.)+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort \
