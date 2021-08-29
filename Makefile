@@ -86,12 +86,15 @@ notify-score:
 alp: ## exec alp
 	@$(foreach host, $(WEB), echo \#\# $(host); cat ./tmp/nginx.$(host).log | alp ltsv $(ALP_OPTION))
 
-alp.log-rotate: ## logrotate nginx on remote host
+alp.log-rotate: ## logrotate nginx
 	$(foreach host, $(WEB),$(call logrotate-nginx,$(host)))
 	$(call notify-slack,Executed: rotate Nginx access.log )
 
 alp.log-download: ## download Nginx log
 	$(foreach host, $(WEB),$(shell $(SCP) $(host):$(NGINX_LOG) ./tmp/nginx.$(host).log))
+
+slowquery: ## analyze slow query
+	@$(foreach host, $(DB),$(call exec-command,$(host), echo -n \#\# $(host); sudo mysqldumpslow $(MYSQL_DUMPSLOW_OPTION) | head -n \$$(( 3 * $(SLOWQUERY_LIMIT) ))))
 
 slowquery.on: ## enable slow query
 	$(foreach host, $(DB),$(call exec-command,$(host), MYSQL_PWD=$(MYSQL_PASS) mysql -u$(MYSQL_USER) -e 'set global slow_query_log=1; set global long_query_time=0;'))
@@ -99,8 +102,9 @@ slowquery.on: ## enable slow query
 slowquery.off: ## disable slow query
 	$(foreach host, $(DB),$(call exec-command,$(host), MYSQL_PWD=$(MYSQL_PASS) mysql -u$(MYSQL_USER) -e 'set global slow_query_log=0;'))
 
-slowquery: ## analyze slow query
-	@$(foreach host, $(DB),$(call exec-command,$(host), echo -n \#\# $(host); sudo mysqldumpslow $(MYSQL_DUMPSLOW_OPTION) | head -n \$$(( 3 * $(SLOWQUERY_LIMIT) ))))
+slowquery.log-rotate: ## logrotate slowquery
+	$(foreach host, $(WEB),$(call logrotate-mysqlslow, $(host)))
+	$(call notify-slack,Executed: rotate MySQL slow query log )
 
 deploy.envsh: ## deploy env.sh
 	$(foreach host, $(ALL_HOSTS),$(call update-git,$(host)))
