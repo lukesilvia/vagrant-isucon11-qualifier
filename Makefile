@@ -8,6 +8,7 @@ ALL_HOSTS := isu1 # isu2 isu3
 WEB := isu1 # isu2 isu3
 DB  := isu1 # isu2 isu3
 
+REPOSITORY_URL := https://github.com/lukesilvia/vagrant-isucon11-qualifier.git
 REMOTE_GIT_DIR := /home/isucon/git
 
 NGINX_LOG := /var/log/nginx/access.log
@@ -79,6 +80,9 @@ endef
 
 local.configure: ## Configure local machine.(e.g. ssh_config)
 	sh utility/generate_ssh_config.sh $(USERNAME) $(subst $(space),$(comma),$(ALL_HOST_IPADDRESSES)) > $(SSH_CONFIG)
+
+remote.configure: ## Configure remote servers.
+	$(foreach host, $(ALL_HOSTS),$(call exec-command,$(host),test -e $(REMOTE_GIT_DIR) || git clone $(REPOSITORY_URL) $(REMOTE_GIT_DIR)))
 
 notify-score:
 	echo "スコア $(SCORE) / $$(git rev-parse HEAD)" |  ./utility/notify_slack-$(shell uname -s) -c ./utility/notify_slack.toml
