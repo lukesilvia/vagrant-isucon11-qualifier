@@ -7,7 +7,6 @@ ALL_HOST_IPADDRESSES := xx.xx.xx.xx yy.yy.yy.yy zz.zz.zz.zz
 ALL_HOSTS := isu1 # isu2 isu3
 WEB := isu1 # isu2 isu3
 DB  := isu1 # isu2 isu3
-APP_MAIN_SERVERS := isu1 # isu2 isu3
 
 REMOTE_GIT_DIR := /home/isucon/git
 
@@ -16,6 +15,9 @@ NGINX_LOG := /var/log/nginx/access.log
 SSH := ssh -F $(SSH_CONFIG)
 SCP := scp -F $(SSH_CONFIG)
 RSYNC := rsync -e "$(SSH)" -av --delete --force --omit-dir-times
+
+APP_SERVICE := isucondition.ruby
+DB_SERVICE := mariadb
 
 ALP_OPTION := --sort=sum -r -m '/api/isu/\w+,/isu/\w+,/api/condition/\w+' -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg
 
@@ -48,11 +50,14 @@ endef
 
 define update-app
 $(SSH) $(1) "cd /home/isucon/webapp/ruby && /home/isucon/local/ruby/bin/bundle install";
-$(SSH) $(1) "sudo systemctl restart isucondition.ruby";
+endef
+
+define restart-app
+$(SSH) $(1) "sudo systemctl restart $(APP_SERVICE)";
 endef
 
 define restart-db
-$(SSH) $(1) "sudo systemctl restart mariadb";
+$(SSH) $(1) "sudo systemctl restart $(DB_SERVICE)";
 endef
 
 define restart-mock
@@ -94,6 +99,13 @@ deploy.mysql: ## deploy mysql config
 	$(foreach host, $(DB),$(call exec-command,$(host), find ${REMOTE_GIT_DIR}/infra/etc/mysql -type f -exec sh -c 'sudo cp {} \$$(echo {} | sed -e s_${REMOTE_GIT_DIR}/infra__)' \;))
 	$(foreach host, $(DB), $(call restart-db,$(host)))
 	$(call notify-slack,Executed: Update mysql config )
+
+deploy.systemd: ## deploy systemd config
+	$(foreach host, $(WEB),$(call update-git,$(host)))
+	$(foreach host, $(DB),$(call exec-command,$(host), find ${REMOTE_GIT_DIR}/infra/etc/systemd -type f -exec sh -c 'sudo cp {} \$$(echo {} | sed -e s_${REMOTE_GIT_DIR}/infra__)' \;))
+	$(foreach host, $(WEB), $(call daemon-reload,$(host)))
+	$(foreach host, $(WEB), $(call restart-app,$(host)))
+	$(call notify-slack,Executed: Update systemd config )
 
 help: ## Self-documented Makefile
 	@grep -E '^([a-zA-Z_-]|\.)+:.*?## .*$$' $(MAKEFILE_LIST) \
