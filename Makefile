@@ -19,7 +19,12 @@ RSYNC := rsync -e "$(SSH)" -av --delete --force --omit-dir-times
 APP_SERVICE := isucondition.ruby
 DB_SERVICE := mariadb
 
+MYSQL_USER := isucon
+MYSQL_PASS := isucon
+
 ALP_OPTION := --sort=sum -r -m '/api/isu/\w+,/isu/\w+,/api/condition/\w+' -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg
+MYSQL_DUMPSLOW_OPTION := -s c
+SLOWQUERY_LIMIT := 10
 
 space := $(subst ,, )
 comma := ,
@@ -42,6 +47,10 @@ define logrotate-nginx
 $(SSH) $(1) "sudo chmod 644 $(NGINX_LOG)";
 $(SSH) $(1) "sudo mv $(NGINX_LOG) $(NGINX_LOG).lotated";
 $(SSH) $(1) "sudo systemctl reload nginx";
+endef
+
+define logrotate-mysqlslow
+$(SSH) $(1) "sudo find /var/lib/mysql -type f -name '*-slow.log' -exec mv {} {}.lotated \;";
 endef
 
 define restart-nginx
@@ -74,7 +83,7 @@ local.configure: ## Configure local machine.(e.g. ssh_config)
 notify-score:
 	echo "スコア $(SCORE) / $$(git rev-parse HEAD)" |  ./utility/notify_slack-$(shell uname -s) -c ./utility/notify_slack.toml
 
-alp: ## Exec alp
+alp: ## exec alp
 	@$(foreach host, $(WEB), echo \#\# $(host); cat ./tmp/nginx.$(host).log | alp ltsv $(ALP_OPTION))
 
 alp.log-rotate: ## logrotate nginx on remote host
@@ -83,6 +92,15 @@ alp.log-rotate: ## logrotate nginx on remote host
 
 alp.log-download: ## download Nginx log
 	$(foreach host, $(WEB),$(shell $(SCP) $(host):$(NGINX_LOG) ./tmp/nginx.$(host).log))
+
+slowquery.on: ## enable slow query
+	$(foreach host, $(DB),$(call exec-command,$(host), MYSQL_PWD=$(MYSQL_PASS) mysql -u$(MYSQL_USER) -e 'set global slow_query_log=1; set global long_query_time=0;'))
+
+slowquery.off: ## disable slow query
+	$(foreach host, $(DB),$(call exec-command,$(host), MYSQL_PWD=$(MYSQL_PASS) mysql -u$(MYSQL_USER) -e 'set global slow_query_log=0;'))
+
+slowquery: ## analyze slow query
+	@$(foreach host, $(DB),$(call exec-command,$(host), echo -n \#\# $(host); sudo mysqldumpslow $(MYSQL_DUMPSLOW_OPTION) | head -n \$$(( 3 * $(SLOWQUERY_LIMIT) ))))
 
 deploy.envsh: ## deploy env.sh
 	$(foreach host, $(ALL_HOSTS),$(call update-git,$(host)))
